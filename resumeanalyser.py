@@ -187,6 +187,7 @@ class ResumeDecision(BaseModel):
 sup_agent = create_agent(
     model = llm,
     tools = [call_skill_edu_matcher, call_exp_matcher, call_sal_matcher],
+    response_format = ResumeDecision,
     system_prompt = '''
     You are a senior recruiting manager screening resumes for shortlisting.
 
@@ -225,13 +226,24 @@ st.title("Resume Analyzer")
 uploaded_resume = st.file_uploader("Upload Resume (PDF)", type=["pdf"])
 uploaded_job_desc = st.file_uploader("Upload Job Description (PDF)", type=["pdf"])
 if uploaded_resume and uploaded_job_desc:
-    if st.button("evaluate"):
-        resume_text = extract_text_from_upload(uploaded_resume)
-        job_desc_text = extract_text_from_upload(uploaded_job_desc)
-        response = sup_agent.invoke({'messages': [
-            HumanMessage(
-                f''' Analyze the given resume {resume_text} with job description {job_desc_text}'''
-            )
-        ]})
-        st.subheader("Evaluation Result")
-        st.json(response['messages'][-1].content)
+    if st.button("Evaluate"):
+        with st.spinner("Analyzing resume..."):
+            resume_text = extract_text_from_upload(uploaded_resume)
+            job_desc_text = extract_text_from_upload(uploaded_job_desc)
+            response = sup_agent.invoke({'messages': [
+                HumanMessage(
+                    f'''Analyze the given resume {resume_text} with job description {job_desc_text}'''
+                )
+            ]})
+            st.subheader("Evaluation Result")
+            result = response['structured_response']
+            decision_color = "green" if result.decision == "APPROVE" else "red"
+            st.markdown(f"### :{decision_color}[**{result.decision}**] — Score: **{result.score}/100**")
+            st.markdown("**Summary**")
+            st.write(result.summary)
+            with st.expander("Skill & Education Fit"):
+                st.write(result.skill_fit)
+            with st.expander("Experience Fit"):
+                st.write(result.experience_fit)
+            with st.expander("Salary Alignment"):
+                st.write(result.salary_alignment)
